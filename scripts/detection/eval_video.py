@@ -93,8 +93,7 @@ if __name__ == '__main__':
     else:
         classifier = None
     
-    #while True:
-    for i in range(1):
+    while True:
         topfield_copy = np.copy(topfield)
         ret, frame = cap.read()
         if ret:

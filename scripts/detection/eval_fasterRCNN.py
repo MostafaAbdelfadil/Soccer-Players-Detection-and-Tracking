@@ -122,7 +122,7 @@ def eval_image(frame, image, model, device, birdeye=False, topfield=None, op=Non
         if detector is not None:
             bboxes = detection[0][0]['boxes'].detach().cpu().numpy()
             #print(bboxes.shape)
-            bboxes = NMS(bboxes)
+            #bboxes = NMS(bboxes)
             #print(bboxes.shape)
             #print()
             teams = detector.getTeams(frame, bboxes)

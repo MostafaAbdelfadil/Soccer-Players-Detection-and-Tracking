@@ -172,7 +172,7 @@ def eval_image(frame, image, model, device, birdeye=False, topfield=None, op=Non
             for d, bbox in enumerate(detection[0][0]['boxes']):
                     cv2.rectangle(show,
                                 (int(bbox[0]), int(bbox[1]), int(bbox[2] - bbox[0]), int(bbox[3] - bbox[1])),
-                                (255, 255, 255), 1)
+                                (255, 0, 0), 2)
 
                     if birdeye:
                         w = float((bbox[2] - bbox[0])/2)

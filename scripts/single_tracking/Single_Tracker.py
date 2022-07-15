@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 import pandas as pd
 import seaborn as sns
+import sys
+sys.path.append('../detection')
 from TopView import PerspectiveTransformation
 import matplotlib.pyplot as plt
 from matplotlib.patches import Arc

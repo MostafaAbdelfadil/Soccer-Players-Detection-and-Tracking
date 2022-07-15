@@ -1,9 +1,5 @@
 
 import sys, os, time
-if sys.version_info[0] == 2:
-    import xml.etree.cElementTree as ET
-else:
-    import xml.etree.ElementTree as ET
 import cv2
 import numpy as np
 import collections
@@ -15,25 +11,15 @@ from collections import Counter
 
 # detector utils
 import sys
-sys.path.append('../other_utils/lighttrack')
-
-
-# pose estimation utils
-from HPE.dataset import Preprocessing
-from HPE.config import cfg
-
-
-sys.path.append(os.path.abspath("../other_utils/lighttrack/"))
-sys.path.append(os.path.abspath("../other_utils/lighttrack/utils"))
-sys.path.append(os.path.abspath("../other_utils/lighttrack/visualizer"))
-sys.path.append(os.path.abspath("../other_utils/lighttrack/graph"))
+sys.path.append(os.path.abspath("../other_utils/track/utils"))
+sys.path.append(os.path.abspath("../other_utils/track/visualizer"))
 
 from utils_json import *
 from visualizer import *
 from utils_io_file import *
 from utils_io_folder import *
 from math import *
-from natsort import natsorted, ns
+#from natsort import natsorted, ns
 import scipy.optimize as scipy_opt
 import motmetrics as mm
 import matplotlib.pyplot as plt
@@ -47,43 +33,6 @@ from PIL import Image
 
 import csv
 
-flag_nms = False #Default is False, unless you know what you are doing
-
-def show_skeleton(img,pose_keypoints_2d):
-    joints = reshape_keypoints_into_joints(pose_keypoints_2d)
-    img = show_poses_from_python_data(img, joints, joint_pairs, joint_names)
-
-def initialize_parameters():
-    global video_name, img_id
-
-    global nms_method, nms_thresh, min_scores, min_box_size
-    nms_method = 'nms'
-    nms_thresh = 1.
-    min_scores = 1e-10
-    min_box_size = 0.
-
-    global keyframe_interval, enlarge_scale, pose_matching_threshold
-    keyframe_interval = 1 # choice examples: [2, 3, 5, 8, 10, 20, 40, 100, ....]
-    enlarge_scale = 0.2 # how much to enlarge the bbox before pose estimation
-    pose_matching_threshold = 0.5
-
-    global flag_flip
-    flag_flip = True
-
-    global total_time_POSE, total_time_DET, total_time_ALL, total_num_FRAMES, total_num_PERSONS
-    total_time_POSE = 0
-    total_time_DET = 0
-    total_time_ALL = 0
-    total_num_FRAMES = 0
-    total_num_PERSONS = 0
-
-    global spacial_thresh
-    spacial_thresh = 0.3  # The max distance between 2 frames: Default : 0.3
-
-    global check_pose_threshold, check_pose_method
-    check_pose_threshold = 0.6 # The threshold on the confidence of pose estimation.
-    check_pose_method = 'max_average' # How to average the confidences of the key points for a global confidence
-    return
 
 
 def enlarge_bbox(bbox, scale, image_shape):
@@ -105,24 +54,6 @@ def enlarge_bbox(bbox, scale, image_shape):
     return bbox_enlarged
 
 
-def parse_voc_xml(node):
-    voc_dict = {}
-    children = list(node)
-    if children:
-        def_dic = collections.defaultdict(list)
-        for dc in map(parse_voc_xml, children):
-            for ind, v in dc.items():
-                def_dic[ind].append(v)
-        voc_dict = {
-            node.tag:
-                {ind: v[0] if len(v) == 1 else v
-                 for ind, v in def_dic.items()}
-        }
-    if node.text:
-        text = node.text.strip()
-        if not children:
-            voc_dict[node.tag] = text
-    return voc_dict
 
 def rescale_img(img,rescale_img_factor):
     shape = img.size
@@ -136,35 +67,7 @@ def rescale_img(img,rescale_img_factor):
     img = torchvision.transforms.Pad((int(w_pad),int(h_pad)))(img)
     return(img)
 
-def rescale_img_bbox(bbox,rescale_img_factor,image_shape):
-    w = image_shape[1]
-    h = image_shape[0]
-    bbox = np.array(bbox)*rescale_img_factor
-    target_w = w*rescale_img_factor
-    target_h = h*rescale_img_factor
-    w_pad = (w - target_w)/2.
-    h_pad = (h - target_h)/2.
-    new_w = target_w + 2*w_pad
-    new_h = target_h + 2*h_pad
-    bbox_center = bbox + np.array([w_pad,h_pad,w_pad,h_pad])
-    return(bbox_center)
 
-def extract_annotations(annotation_path, rescale_bbox, rescale_img_factor, image_shape):
-    GT_bbox_list = []
-    GT_idx_list = []
-    target = parse_voc_xml(ET.parse(annotation_path).getroot())
-    anno = target['annotation']
-    image_path = anno['path']
-    objects = anno['object']
-    for obj in objects:
-        idx = obj['name']
-        bbox = obj['bndbox']
-        bbox = [int(bbox[n]) for n in ['xmin', 'ymin', 'xmax', 'ymax']]
-        bbox = enlarge_bbox(bbox,rescale_bbox,image_shape)
-        bbox = rescale_img_bbox(bbox,rescale_img_factor,image_shape)
-        GT_bbox_list.append(bbox)
-        GT_idx_list.append(idx)
-    return(GT_bbox_list, GT_idx_list,image_path)
 
 def player_detection(im, rescale_img_factor, model_detection, thres_detection):
     bbox_list = []
@@ -188,13 +91,12 @@ def player_detection(im, rescale_img_factor, model_detection, thres_detection):
     return(bbox_list,score_list,features)
 
 
-def light_track(pose_estimator, model_detection, visual_feat_model, layer,
-            image_folder, annotation_folder, rescale_bbox, rescale_img_factor,
-             input_path,output_video_path, output_csv_path, use_features,
-            w_spacial, w_visual, w_pose, use_IOU, spacial_iou_thresh, thres_detection,
-            use_pose, use_visual_feat, imagenet_model,
-            display_pose, use_GT_position, flag_method, n_img_max, init_frame,
-            frame_interval, write_csv, write_video, keyframe_interval, visualize,
+def track( model_detection, visual_feat_model, layer,
+            rescale_img_factor,input_path,output_video_path, use_features,
+            w_spacial, w_visual, use_IOU, spacial_iou_thresh, thres_detection,
+             use_visual_feat, imagenet_model,
+             use_GT_position, flag_method,
+             keyframe_interval, visualize,
             use_filter_tracks, thres_count_ids,visual_metric,
             N_frame_lost_keep, N_past_to_keep, use_ReID_module,
             N_past_to_keep_reID, max_vis_feat, max_dist_factor_feat, max_vis_reID, max_dist_factor_reID,
@@ -221,11 +123,11 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
 
     flag_mandatory_keyframe = False
 
-    
-
+    use_ReID_module=False
     acc = mm.MOTAccumulator(auto_id=True)
     path=input_path
     cap=cv2.cv2.VideoCapture(path)
+    #ret,imm=cap.read()
 
     N_IOU = 0
     N_feat = 0
@@ -271,8 +173,8 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                                  "det_id":  0,
                                  "track_id": None,
                                  "bbox": [0, 0, 2, 2],
-                                 "visual_feat": [],
-                                 "keypoints": []}
+                                 "visual_feat": []
+                                 }
                 bbox_dets_list.append(bbox_det_dict)
 
                 bbox_dets_list_list.append(bbox_dets_list)
@@ -313,7 +215,7 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
 
                     if use_IOU :  # use IOU as first criteria
                         spacial_intersect = get_spacial_intersect(bbox_det, bbox_list_prev_frame)
-                        track_id, match_index = get_track_id_SpatialConsistency(spacial_intersect, bbox_list_prev_frame, spacial_iou_thresh)
+                        track_id, match_index = get_track_id_SpatialConsistency(spacial_intersect, bbox_list_prev_frame, spacial_iou_thresh,-1)
                     else :
                         track_id = -1
 
@@ -329,8 +231,8 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                                  "bbox": bbox_det,
                                  "score_det": score_det,
                                  "method": method,
-                                 "visual_feat": [],
-                                 "keypoints": []}
+                                 "visual_feat": []
+                                 }
 
                 bbox_dets_list.append(bbox_det_dict)
 
@@ -346,7 +248,7 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                         bbox_dets_list[el]["track_id"] = -1
                 
                         bbox_dets_list[el]["method"] = None
-                    del track_ids_dict[track]
+                    del track_ids_dict[track]    
             if img_id > 0 and len(bbox_list_prev_frame) > 0 :
 
                 # Remove already assigned elements in the previous frame.
@@ -358,9 +260,9 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                         remaining_det_id_list.append(det_id)
                     else :
                         prev_idx = track_ids_dict_prev[track_id]
-                        prev_to_remove.append(prev_idx[0])
-                        N_IOU+=1
-                
+                        if prev_idx[0] not in prev_to_remove:
+                          prev_to_remove.append(prev_idx[0])
+                          N_IOU+=1
                 for index in sorted(prev_to_remove, reverse=True):
                     del bbox_list_prev_frame[index]
 
@@ -372,11 +274,10 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                     for det_id in remaining_det_id_list :
 
 
-                        next_iddd=-2
+                        next_iddd=-1
                         bbox_dets_list[det_id]["track_id"] = next_iddd
                         bbox_dets_list[det_id]["method"] = None
                         track_ids_dict[next_iddd].append(det_id)
-                        next_id += 1
 
                 elif len(remaining_det_id_list) > 0 :
 
@@ -401,18 +302,7 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                                 past_track_bbox_list.append(bbox_dets_list_list[img_id-i][idx])
 
                         for past_track_bbox in past_track_bbox_list :
-                            if use_pose :
-                                if not past_track_bbox["keypoints"] :
-                                    st_time_pose = time.time()
-                                    inf,_ = inference_feat_keypoints(pose_estimator, past_track_bbox)
-                                    keypoints = inf[0]["keypoints"]
-                                    end_time_pose = time.time()
-                                    total_time_POSE += (end_time_pose - st_time_pose)
-                                else :
-                                    keypoints = past_track_bbox["keypoints"]
-                            else :
-                                keypoints = []
-
+            
                             if use_visual_feat :
                                 if not list(past_track_bbox["visual_feat"]) :
                                     st_time_feat = time.time()
@@ -427,7 +317,6 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                             else :
                                 visual_feat = []
 
-                            past_track_bbox["keypoints"] = keypoints
                             past_track_bbox["visual_feat"] = visual_feat
 
                         past_track_bbox_list_list.append(past_track_bbox_list)
@@ -435,15 +324,6 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                     for det_id in remaining_det_id_list :
 
                         bbox_det_dict = bbox_dets_list[det_id]
-
-                        if use_pose :
-                            st_time_pose = time.time()
-                            inf,_ = inference_feat_keypoints(pose_estimator, bbox_det_dict, rescale_img_factor)
-                            keypoints = inf[0]["keypoints"]
-                            end_time_pose = time.time()
-                            total_time_POSE += (end_time_pose - st_time_pose)
-                        else :
-                            keypoints = []
 
                         if use_visual_feat :
                             st_time_feat = time.time()
@@ -456,16 +336,13 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                         else :
                             visual_feat = []
 
-                        bbox_det_dict["keypoints"] = keypoints
                         bbox_det_dict["visual_feat"] = visual_feat
 
                     if use_features :
-                        #print('g')
                         log = ''
                         bbox_dets_list, bbox_list_prev_frame, past_track_bbox_list_list, track_ids_dict, N_feat = feature_matching(bbox_dets_list,remaining_det_id_list, bbox_list_prev_frame,
-                                                        past_track_bbox_list_list, track_ids_dict, visual_metric, max_dist_factor_feat, max_vis_feat, w_visual, w_spacial, w_pose,
-                                                        use_visual_feat, use_pose, image_shape, log, N_past_to_keep, N_feat)
-                    #print(track_ids_dict)
+                                                        past_track_bbox_list_list, track_ids_dict, visual_metric, max_dist_factor_feat, max_vis_feat, w_visual, w_spacial,
+                                                        use_visual_feat, image_shape, log, N_past_to_keep, N_feat)
 
                     if use_ReID_module :
 
@@ -489,17 +366,7 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
 
                             for past_track_bbox in past_track_bbox_list :
 
-                                if use_pose :
-                                    if not past_track_bbox["keypoints"] :
-                                        st_time_pose = time.time()
-                                        inf,_ = inference_feat_keypoints(pose_estimator, past_track_bbox)
-                                        keypoints = inf[0]["keypoints"]
-                                        end_time_pose = time.time()
-                                        total_time_POSE += (end_time_pose - st_time_pose)
-                                    else :
-                                        keypoints = past_track_bbox["keypoints"]
-                                else :
-                                    keypoints = []
+                  
 
                                 if use_visual_feat :
                                     if not list(past_track_bbox["visual_feat"]) :
@@ -515,12 +382,10 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                                 else :
                                     visual_feat = []
 
-                                past_track_bbox["keypoints"] = keypoints
                                 past_track_bbox["visual_feat"] = visual_feat
 
                             past_track_bbox_list_list_reID.append(past_track_bbox_list)
 
-                        #print(past_track_bbox_list_list_reID)
 
                         # Get non_associated dets
                         remaining_det_id_list = []
@@ -532,34 +397,87 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
                         if len(remaining_det_id_list) > 0 and len(bbox_lost_player_list) > 0 :
                             log = ''
                             bbox_dets_list, bbox_lost_player_list, past_track_bbox_list_list_reID, track_ids_dict, N_reID = feature_matching(bbox_dets_list,remaining_det_id_list, bbox_lost_player_list,
-                                                            past_track_bbox_list_list_reID, track_ids_dict, visual_metric, max_dist_factor_reID, max_vis_reID, w_visual, w_spacial, w_pose, use_visual_feat,
-                                                            use_pose, image_shape, log, N_past_to_keep_reID, N_reID)
+                                                            past_track_bbox_list_list_reID, track_ids_dict, visual_metric, max_dist_factor_reID, max_vis_reID, w_visual, w_spacial, use_visual_feat,
+                                                             image_shape, log, N_past_to_keep_reID, N_reID)
 
+                    
                     # if still can not find a match from previous frame, then -1
+                    if img_id ==2:
+                        num_im=img_id-2
+                        cou=1
+                    else:
+                        num_im=img_id-3
+                        cou=2 
                     for det_id in range(num_dets):
                         track_id = bbox_dets_list[det_id]["track_id"]
-                        if track_id == -1 :
-                            for i in range(num_dets):
-                              if i not in track_ids_dict:
-                                next_idd=i
-                                break
-                            bbox_dets_list[det_id]["track_id"] = next_idd
+                        if track_id==-1:
+                            if img_id>1:
+                              for i in reversed(range(num_im,num_im+cou)):
+                                  boxes_list=bbox_dets_list_list[ i].copy()
+                                  bbox_det = player_candidates[det_id]
+                                  bbox_det = enlarge_bbox(bbox_det, [0.,0.], image_shape)
+                                  spacial_intersect = get_spacial_intersect(bbox_det, boxes_list)
+                                  track_id, match_index = get_track_id_SpatialConsistency(spacial_intersect, boxes_list, spacial_iou_thresh,-1)
+
+                                  if  track_id != -1:
+                                      for de in range(num_dets):
+                                        x,y=bbox_dets_list[de]["det_id"],bbox_dets_list[de]["track_id"]
+                                        if y==track_id:
+                                            next_iddd=-1    
+                                            bbox_dets_list[x]["track_id"] = next_iddd
+                                            bbox_dets_list[x]["method"] = None
+                                            track_ids_dict[next_iddd].append(x)
+                                            #next_id+=1
+                                      break
+
+                            next_iddd=track_id
+                            bbox_dets_list[det_id]["track_id"] = next_iddd
                             bbox_dets_list[det_id]["method"] = None
-                            track_ids_dict[next_idd].append(det_id)
+                            track_ids_dict[next_iddd].append(det_id)             
+
+       
                         
                 else :
                     pass
 
+            if img_id ==2:
+                num_im=img_id-2
+                cou=1
+            else:
+                num_im=img_id-3
+                cou=2 
             for det_id in range(num_dets):
                 track_id = bbox_dets_list[det_id]["track_id"]
-                if track_id==-2:
-                    for j in range(num_dets):
-                      if j not in track_ids_dict:
-                        next_iddd=j
-                        break
+                if track_id==-1:
+                    if img_id>1:
+                        for i in reversed(range(num_im,num_im+cou)):
+                          boxes_list=bbox_dets_list_list[i].copy()
+                          bbox_det = player_candidates[det_id]
+                          bbox_det = enlarge_bbox(bbox_det, [0.,0.], image_shape)
+                          spacial_intersect = get_spacial_intersect(bbox_det, boxes_list)
+                          track_id, match_index = get_track_id_SpatialConsistency(spacial_intersect, boxes_list, spacial_iou_thresh,-1)
+                          if  track_id != -1:
+                              for de in range(num_dets):
+                                  x,y=bbox_dets_list[de]["det_id"],bbox_dets_list[de]["track_id"]
+                                  if y==track_id:
+                                      for j in range(num_dets):
+                                          if j not in track_ids_dict:
+                                            next_iddd=j
+                                            break
+                                      bbox_dets_list[x]["track_id"] = next_iddd
+                                      bbox_dets_list[x]["method"] = None
+                                      track_ids_dict[next_iddd].append(x)
+                              break
+
+                    next_iddd=track_id
+                    if  track_id==-1 or img_id ==1 :
+                         for j in range(num_dets):
+                             if j not in track_ids_dict:
+                                 next_iddd=j
+                                 break                     
                     bbox_dets_list[det_id]["track_id"] = next_iddd
                     bbox_dets_list[det_id]["method"] = None
-                    track_ids_dict[next_iddd].append(det_id)             
+                    track_ids_dict[next_iddd].append(det_id)        
 
             # update frame
 
@@ -589,12 +507,11 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
     if visualize :
         print("Visualizing Tracking Results...")
        
-        show_all_from_dict([], bbox_dets_list_list, classes, joint_pairs, joint_names,
-        rescale_img_factor = rescale_img_factor,
-        path = path, output_folder_path = output_video_path,
-        display_pose = display_pose, flag_track = True, flag_method = flag_method)
+        show_all_from_dict([], bbox_dets_list_list, classes, 
+        rescale_img_factor = rescale_img_factor
+        ,path = path, output_folder_path = output_video_path,
+        flag_track = True, flag_method = flag_method)
         total_num_FRAMES=counter
-            #make_video_from_images(img_paths, output_video_path, fps=25, size=None, is_color=True, format="XVID")
         print("Visualization Finished!")
         print("Finished video {}".format(output_video_path))
 
@@ -611,16 +528,13 @@ def light_track(pose_estimator, model_detection, visual_feat_model, layer,
         print("Average FPS excluding Detection: {:.2f}fps".format(total_num_FRAMES / (total_time_ALL - total_time_DET)))
         print("Average FPS for framework only: {:.2f}fps".format(total_num_FRAMES / (total_time_ALL - total_time_DET - total_time_POSE - total_time_FEAT) ))
 
-    if write_csv is True :
-        print(output_csv_path)
-        write_tracking_csv(bbox_dets_list_list, output_csv_path)
-        print("total_time_ALL: {:.2f}s".format(total_time_ALL))
+
 
    
 
 def feature_matching(bbox_dets_list, remaining_det_id_list, bbox_list_prev_frame, past_track_bbox_list_list, track_ids_dict,
-        visual_metric, max_dist_factor, max_vis, w_visual, w_spacial, w_pose, use_visual_feat,
-        use_pose, image_shape, log, N_past_to_keep, N_meth, show_track = False, show_NN = False):
+        visual_metric, max_dist_factor, max_vis, w_visual, w_spacial, use_visual_feat
+        , image_shape, log, N_past_to_keep, N_meth, show_track = False, show_NN = False):
 
     dist_tab = []
     weight_tab = []
@@ -631,10 +545,7 @@ def feature_matching(bbox_dets_list, remaining_det_id_list, bbox_list_prev_frame
         visual_dist = np.array([list(get_visual_similarity(bbox_dets_list[det_id]['visual_feat'], past_track_bbox_list_list, N_past_to_keep, metric = visual_metric)) for det_id in remaining_det_id_list])
         dist_tab.append(visual_dist)
         weight_tab.append(w_visual)
-    if use_pose :
-        pose_dist = np.array([list(1-get_pose_similarity(bbox_dets_list[det_id]["bbox"],past_track_bbox_list_list, bbox_dets_list[idx]["keypoints"])) for idx,det_id in enumerate(remaining_det_id_list)])
-        dist_tab.append(pose_dist)
-        weight_tab.append(w_pose)
+
 
 
 
@@ -718,63 +629,7 @@ def feature_matching(bbox_dets_list, remaining_det_id_list, bbox_list_prev_frame
 
     return(bbox_dets_list, bbox_list_prev_frame, past_track_bbox_list_list, track_ids_dict, N_meth)
 
-def evaluate_tracking(bbox_dets_list_list, GT_idx_list_list, GT_bbox_list_list) :
 
-    acc = mm.MOTAccumulator(auto_id=True)
-    for f, bbox_dets_list in enumerate(bbox_dets_list_list) :
-        track_ids = [el['track_id'] for el in bbox_dets_list]
-        track_boxes = [el['bbox'] for el in bbox_dets_list]
-        if track_ids:
-            track_boxes = np.stack(track_boxes, axis=0)
-            # x1, y1, x2, y2 --> x1, y1, width, height
-            track_boxes = np.stack((track_boxes[:, 0],
-                                    track_boxes[:, 1],
-                                    track_boxes[:, 2] - track_boxes[:, 0],
-                                    track_boxes[:, 3] - track_boxes[:, 1]),
-                                    axis=1)
-        else:
-            track_boxes = np.array([])
-
-        gt_ids = GT_idx_list_list[f]
-        gt_boxes = GT_bbox_list_list[f]
-        if gt_ids :
-            gt_boxes = np.stack(gt_boxes, axis=0)
-            # x1, y1, x2, y2 --> x1, y1, width, height
-            gt_boxes = np.stack((gt_boxes[:, 0],
-                                 gt_boxes[:, 1],
-                                 gt_boxes[:, 2] - gt_boxes[:, 0],
-                                 gt_boxes[:, 3] - gt_boxes[:, 1]),
-                                axis=1)
-        else:
-            gt_boxes = np.array([])
-
-        distance = mm.distances.iou_matrix(gt_boxes, track_boxes, max_iou=0.5)
-        acc.update(gt_ids, track_ids, distance)
-
-    
-
-    mh = mm.metrics.create()
-
-    summary = mh.compute_many(
-    [acc],
-    metrics=mm.metrics.motchallenge_metrics,
-    names=['full'])
-
-    strsummary = mm.io.render_summary(
-        summary,
-        formatters=mh.formatters,
-        namemap=mm.io.motchallenge_metric_names
-    )
-
-    print(strsummary)
-
-    out_score = mh.compute(acc, metrics=['mota', 'motp','idf1'], name='acc', return_dataframe=False)
-
-    mota = out_score['mota']
-    motp = out_score['motp']
-    idf1 = out_score['idf1']
-
-    return(mota,motp,idf1,acc)
 
 
 def filter_tracks(bbox_dets_list_list, thres_count_ids = 1):
@@ -797,22 +652,9 @@ def filter_tracks(bbox_dets_list_list, thres_count_ids = 1):
             del bbox_dets_list_list[b][index]
     return(bbox_dets_list_list)
 
-def get_pose_similarity(bbox_cur_frame, bbox_list_prev_frame, keypoints_cur_frame, keypoints_list_prev_frame):
-
-    pose_sim = np.zeros(len(bbox_list_prev_frame))
-
-    for det_index, bbox_det_dict in enumerate(bbox_list_prev_frame):
-
-        bbox_prev_frame = bbox_det_dict["bbox"]
-        keypoints_dict = keypoints_list_prev_frame[det_index]
-        keypoints_prev_frame = keypoints_dict["keypoints"]
-        pose_matching_score = get_pose_matching_score(keypoints_cur_frame, keypoints_prev_frame, bbox_cur_frame, bbox_prev_frame)
-        pose_sim[det_index] = pose_matching_score
-
-    return(pose_sim)
 
 
-def get_track_id_SpatialConsistency(spacial_similarities, bbox_list_prev_frame, spacial_thresh):
+def get_track_id_SpatialConsistency(spacial_similarities, bbox_list_prev_frame, spacial_thresh,x):
 
     if len(spacial_similarities) == 1 :
         if spacial_similarities[0] > spacial_thresh :
@@ -820,12 +662,12 @@ def get_track_id_SpatialConsistency(spacial_similarities, bbox_list_prev_frame, 
             track_id = bbox_list_prev_frame[max_index]["track_id"]
             return track_id, max_index
         else :
-            return -1, None
+            return x, None
 
     sim_argsort = np.argsort(spacial_similarities)
     sim_sort = spacial_similarities[sim_argsort]
     if sim_sort[-1] <= 0 :
-        return -1, None
+        return x, None
     elif sim_sort[-1] > 0 and sim_sort[-2] <= 0 :
         max_index = sim_argsort[-1]
         track_id = bbox_list_prev_frame[max_index]["track_id"]
@@ -836,7 +678,7 @@ def get_track_id_SpatialConsistency(spacial_similarities, bbox_list_prev_frame, 
             track_id = bbox_list_prev_frame[max_index]["track_id"]
             return track_id, max_index
         else :
-            return -1, None
+            return x, None
 
 def get_spacial_intersect(bbox_cur_frame, bbox_list_prev_frame):
 
@@ -887,55 +729,9 @@ def get_visual_similarity(feat, past_track_bbox_list_list, N_past_to_keep, metri
             res.append(np.linalg.norm(feat-feat_vector,2))
     return(np.array(res))
 
-def get_pose_matching_score(keypoints_A, keypoints_B, bbox_A, bbox_B):
-    if keypoints_A == [] or keypoints_B == []:
-        print("a graph not correctly generated!")
-        return sys.maxsize
-
-    graph_A, flag_pass_check = keypoints_to_graph(keypoints_A, bbox_A)
-    if flag_pass_check is False:
-        print("c graph not correctly generated!")
-        return sys.maxsize
-
-    graph_B, flag_pass_check = keypoints_to_graph(keypoints_B, bbox_B)
-    if flag_pass_check is False:
-        print("d graph not correctly generated!")
-        return sys.maxsize
-
-    sample_graph_pair = (graph_A, graph_B)
-    data_A, data_B = graph_pair_to_data(sample_graph_pair)
-
-    start = time.time()
-    flag_match, dist = pose_matching(data_A, data_B)
-    end = time.time()
-    return dist
 
 
-def get_iou_score(bbox_gt, bbox_det):
-    iou_score = iou(boxA, boxB)
-    return iou_score
 
-
-def is_target_lost(keypoints, method, check_pose_threshold):
-    num_keypoints = int(len(keypoints) / 3.0)
-    if method == "average":
-        # pure average
-        score = 0
-        for i in range(num_keypoints):
-            score += keypoints[3*i + 2]
-        score /= num_keypoints*1.0
-        print("target_score: {}".format(score))
-    elif method == "max_average":
-        score_list = keypoints[2::3]
-        score_list_sorted = sorted(score_list)
-        top_N = 4
-        assert(top_N < num_keypoints)
-        top_scores = [score_list_sorted[-i] for i in range(1, top_N+1)]
-        score = sum(top_scores)/top_N
-    if score < check_pose_threshold :
-        return True
-    else:
-        return False
 
 
 def iou(boxA, boxB):
@@ -963,32 +759,7 @@ def iou(boxA, boxB):
     return iou
 
 
-def get_bbox_from_keypoints(keypoints_python_data, img_shape):
-    if keypoints_python_data == [] or keypoints_python_data == 45*[0]:
-        return [0, 0, 2, 2]
 
-    num_keypoints = len(keypoints_python_data)
-    x_list = []
-    y_list = []
-    for keypoint_id in range(int(num_keypoints / 3)):
-        x = keypoints_python_data[3 * keypoint_id]
-        y = keypoints_python_data[3 * keypoint_id + 1]
-        vis = keypoints_python_data[3 * keypoint_id + 2]
-        if vis != 0 and vis!= 3:
-            x_list.append(x)
-            y_list.append(y)
-    min_x = min(x_list)
-    min_y = min(y_list)
-    max_x = max(x_list)
-    max_y = max(y_list)
-
-    if not x_list or not y_list:
-        return [0, 0, 2, 2]
-
-    scale = enlarge_scale # enlarge bbox by 20% with same center position
-    bbox = enlarge_bbox([min_x, min_y, max_x, max_y], [scale,scale], img_shape)
-    bbox_in_xywh = x1y1x2y2_to_xywh(bbox)
-    return bbox_in_xywh
 
 
 
@@ -1032,156 +803,7 @@ def get_visual_feat_fasterRCNN(model,data,features,image_sizes,use_track_branch)
             feat2 = model.roi_heads(features, proposals, image_sizes, get_feature_only=True)[0].cpu()
         return feat
 
-def inference_feat_keypoints(pose_estimator, test_data, flag_nms=False):
-    cls_dets = test_data["bbox"]
-    # nms on the bboxes
-    if flag_nms is True:
-        cls_dets, keep = apply_nms(cls_dets, nms_method, nms_thresh)
-        test_data = np.asarray(test_data)[keep]
-        if len(keep) == 0:
-            return -1
-    else:
-        test_data = [test_data]
 
-    # crop and detect pose
-    pose_heatmaps, feat, details, cls_skeleton, crops, start_id, end_id = get_pose_feat_from_bbox(pose_estimator, test_data, cfg)
-    # get keypoint positions from pose
-    keypoints = get_keypoints_from_pose(pose_heatmaps, details, cls_skeleton, crops, start_id, end_id)
-    # dump results
-    pose_results = prepare_results(test_data[0], keypoints, cls_dets)
-    #feat /= np.linalg.norm(feat)
-    return pose_results, feat
-
-
-def apply_nms(cls_dets, nms_method, nms_thresh):
-    # nms and filter
-    keep = np.where((cls_dets[:, 4] >= min_scores) &
-                    ((cls_dets[:, 3] - cls_dets[:, 1]) * (cls_dets[:, 2] - cls_dets[:, 0]) >= min_box_size))[0]
-    cls_dets = cls_dets[keep]
-    if len(cls_dets) > 0:
-        if nms_method == 'nms':
-            keep = gpu_nms(cls_dets, nms_thresh)
-        elif nms_method == 'soft':
-            keep = cpu_soft_nms(np.ascontiguousarray(cls_dets, dtype=np.float32), method=2)
-        else:
-            assert False
-    cls_dets = cls_dets[keep]
-    return cls_dets, keep
-
-
-def get_pose_feat_from_bbox(pose_estimator, test_data, cfg):
-    cls_skeleton = np.zeros((len(test_data), cfg.nr_skeleton, 3))
-    crops = np.zeros((len(test_data), 4))
-
-    batch_size = 1
-    start_id = 0
-    end_id = min(len(test_data), batch_size)
-
-    test_imgs = []
-    details = []
-    for i in range(start_id, end_id):
-        test_img, detail = Preprocessing(test_data[i], stage='test')
-        test_imgs.append(test_img)
-        details.append(detail)
-
-    details = np.asarray(details)
-    feed = test_imgs
-    for i in range(end_id - start_id):
-        ori_img = test_imgs[i][0].transpose(1, 2, 0)
-        if flag_flip == True:
-            flip_img = cv2.flip(ori_img, 1)
-            feed.append(flip_img.transpose(2, 0, 1)[np.newaxis, ...])
-    feed = np.vstack(feed)
-
-    predict = pose_estimator.predict_one([feed.transpose(0, 2, 3, 1).astype(np.float32)])
-    res = predict[0]
-    res = res.transpose(0, 3, 1, 2)
-
-    try :
-        feat = predict[1].squeeze()[0,:]
-        feat /= np.linalg.norm(feat) # 2 x 1024
-    except :
-        feat = None
-
-    if flag_flip == True:
-        for i in range(end_id - start_id):
-            fmp = res[end_id - start_id + i].transpose((1, 2, 0))
-            fmp = cv2.flip(fmp, 1)
-            fmp = list(fmp.transpose((2, 0, 1)))
-            for (q, w) in cfg.symmetry:
-                fmp[q], fmp[w] = fmp[w], fmp[q]
-            fmp = np.array(fmp)
-            res[i] += fmp
-            res[i] /= 2
-
-    pose_heatmaps = res
-
-    return pose_heatmaps, feat,  details, cls_skeleton, crops, start_id, end_id
-
-
-def get_keypoints_from_pose(pose_heatmaps, details, cls_skeleton, crops, start_id, end_id):
-    res = pose_heatmaps
-
-    for test_image_id in range(start_id, end_id):
-
-        r0 = res[test_image_id - start_id].copy()
-        r0 /= 255.
-        r0 += 0.5
-
-        for w in range(cfg.nr_skeleton):
-            res[test_image_id - start_id, w] /= np.amax(res[test_image_id - start_id, w])
-
-        border = 10
-        dr = np.zeros((cfg.nr_skeleton, cfg.output_shape[0] + 2 * border, cfg.output_shape[1] + 2 * border))
-        dr[:, border:-border, border:-border] = res[test_image_id - start_id][:cfg.nr_skeleton].copy()
-
-        for w in range(cfg.nr_skeleton):
-            dr[w] = cv2.GaussianBlur(dr[w], (21, 21), 0)
-
-        for w in range(cfg.nr_skeleton):
-            lb = dr[w].argmax()
-            y, x = np.unravel_index(lb, dr[w].shape)
-            dr[w, y, x] = 0
-            lb = dr[w].argmax()
-            py, px = np.unravel_index(lb, dr[w].shape)
-            y -= border
-            x -= border
-            py -= border + y
-            px -= border + x
-            ln = (px ** 2 + py ** 2) ** 0.5
-            delta = 0.25
-            if ln > 1e-3:
-                x += delta * px / ln
-                y += delta * py / ln
-            x = max(0, min(x, cfg.output_shape[1] - 1))
-            y = max(0, min(y, cfg.output_shape[0] - 1))
-            cls_skeleton[test_image_id, w, :2] = (x * 4 + 2, y * 4 + 2)
-            cls_skeleton[test_image_id, w, 2] = r0[w, int(round(y) + 1e-10), int(round(x) + 1e-10)]
-
-        # map back to original images
-        crops[test_image_id, :] = details[test_image_id - start_id, :]
-        for w in range(cfg.nr_skeleton):
-            cls_skeleton[test_image_id, w, 0] = cls_skeleton[test_image_id, w, 0] / cfg.data_shape[1] * (crops[test_image_id][2] - crops[test_image_id][0]) + crops[test_image_id][0]
-            cls_skeleton[test_image_id, w, 1] = cls_skeleton[test_image_id, w, 1] / cfg.data_shape[0] * (crops[test_image_id][3] - crops[test_image_id][1]) + crops[test_image_id][1]
-
-    return cls_skeleton
-
-
-def prepare_results(test_data, cls_skeleton, cls_dets):
-    cls_partsco = cls_skeleton[:, :, 2].copy().reshape(-1, cfg.nr_skeleton)
-
-    cls_scores = 1
-    dump_results = []
-    cls_skeleton = np.concatenate(
-        [cls_skeleton.reshape(-1, cfg.nr_skeleton * 3), (cls_scores * cls_partsco.mean(axis=1))[:, np.newaxis]],
-        axis=1)
-    for i in range(len(cls_skeleton)):
-        result = dict(image_id=test_data['img_id'],
-                      category_id=1,
-                      score=float(round(cls_skeleton[i][-1], 4)),
-                      keypoints=cls_skeleton[i][:-1].round(3).tolist())
-        dump_results.append(result)
-    return dump_results
 
 def is_keyframe(img_id, interval=10):
     if img_id % interval == 0:
@@ -1189,38 +811,6 @@ def is_keyframe(img_id, interval=10):
     else:
         return False
 
-def make_my_json(nframe, dets_list_list,output_file):
-    final = {}
-    final['frames'] = []
-    for img_id in range(nframe):
-        current_dict = {}
-        current_dict["img_id"] = img_id
-        current_dict["class"] = "frame"
-        current_dict["hypotheses"] = []
-        final['frames'].append(current_dict)
-    final['class'] = "video"
-    final['filename'] = "file.idx"
-
-    for i in range(len(dets_list_list)):
-        dets_list = dets_list_list[i]
-        if dets_list == []:
-            continue
-        for j in range(len(dets_list)):
-            bbox = dets_dict["bbox"][0:4]
-            img_id = dets_dict["img_id"]
-            track_id = dets_dict["track_id"]
-            current_ann = {"id": track_id, "x": bbox[0], "y": bbox[1], "width": bbox[2], "height": bbox[3]}
-            final['frames'][img_id]["hypotheses"].append(current_ann)
-    return(final)
-
-def write_tracking_csv(bbox_dets_list_list, output_file):
-    with open(output_file, mode='w') as csv_file:
-        writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        for frame_id,bbox_dets_list in enumerate(bbox_dets_list_list) :
-            for bbox_dets in bbox_dets_list :
-                bbox = bbox_dets["bbox"][0:4]
-                to_write = [bbox_dets["img_id"],bbox_dets["track_id"], bbox[0], bbox[1], bbox[2], bbox[3], -1, -1, -1, -1]
-                writer.writerow(to_write)
 
 
 def x1y1x2y2_to_xywh(det):
@@ -1234,18 +824,6 @@ def xywh_to_x1y1x2y2(det):
     x2, y2 = x1 + w, y1 + h
     return [x1, y1, x2, y2]
 
-def bbox_valid(bbox,image_shape):
-    valid = 0<=bbox[0]<=image_shape[1] and 0<=bbox[2]<=image_shape[1] and 0<=bbox[1]<=image_shape[0] and 0<=bbox[3]<=image_shape[0]
-    if bbox == [0, 0, 2, 2]:
-        valid=False
-    return valid
-
-def filter_detections(human_candidates, image_shape):
-    res = []
-    for det in human_candidates :
-        if bbox_valid(det, image_shape) :
-            res.append(det)
-    return(det)
 
 
 def bipartite_matching_greedy(C):

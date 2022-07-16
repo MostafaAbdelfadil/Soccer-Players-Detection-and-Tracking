@@ -56,7 +56,7 @@ The script eval_video.py enables to get the detection result of the model, to do
 '--classify' and 'birdeye' is valid only on our video from stitching 'invideo.mp4'
 ```
 cd scripts/detection
-python eval_video.py --invideo <video_name.mp4> --birdeye --classify --backbone resnet18 --checkpoint ../../checkpoints_runs/player_det_resnet18_teacher.pth
+python eval_video.py --invideo <video_name.mp4> --birdeye --classify --backbone resnet18 --checkpoint ../../checkpoints_runs/player_det_resnet18_student.pth
 
 ```
 output video will be in 'birdEye.mp4' if '--birdeye' and in 'frontEye.mp4' by default. Also, you can specify the output name using '--birdout' and '--frontout'.

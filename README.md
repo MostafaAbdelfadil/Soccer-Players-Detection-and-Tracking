@@ -52,7 +52,7 @@ Soccer-Players-Detection-and-Tracking
 
 
 The script eval_video.py enables to get the detection result of the model, to do so put your test video in scripts/detection/data/<your_video.mp4>, '--birdeye' to get the birdeye view, '--classify' to apply classification. out video will be saved in the folder 'script/detection/results/out'.
-'--classify' is valid only on our video from stitching 'invideo.mp4'
+'--classify' and 'birdeye' is valid only on our video from stitching 'invideo.mp4'
 ```
 cd scripts/detection
 python eval_video.py --birdeye --classify --backbone resnet18 --checkpoint ../../checkpoints_runs/player_det_resnet50_teacher.pth

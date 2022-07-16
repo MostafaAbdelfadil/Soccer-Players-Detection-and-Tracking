@@ -70,3 +70,16 @@ cd scripts/tracking
 python main_tracking --visualize --input_path <your_video.mp4>
 ```
 
+**Single player tracking**
+
+* you can test your own video using the command below or using our videos above.
+
+```
+cd scripts/single_tracking
+python single_track.py INPUT_VIDEO_PATH [-p PLAYER_NAME]
+```
+Provide it with the input video path, the output video path and optionally the player’s name.
+
+Then when the video finishes it will save three files, a JSON file containing the recorded 2D positions of the tracked player, an image showing the heatmap, and the output video showing the bounding box of the tracked player across all frames.
+
+If the tracker loses the player press the key ‘e’ to reselect the player. And to exit the tracking press the ESC key.

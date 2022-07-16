@@ -5,7 +5,7 @@ from torchvision.ops.feature_pyramid_network import FeaturePyramidNetwork, LastL
 from torchvision.ops import misc as misc_nn_ops
 from torchvision.models._utils import IntermediateLayerGetter
 
-import detnet
+#import detnet
 import resnet
 
 """

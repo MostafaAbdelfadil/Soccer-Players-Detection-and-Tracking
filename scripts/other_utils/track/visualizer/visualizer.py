@@ -27,7 +27,7 @@ def rescale_img(img,rescale_img_factor):
 
 def show_all_from_dict(keypoints_list_list, bbox_dets_list_list, classes, rescale_img_factor = 1., path = None, output_folder_path = None, flag_track= False, flag_method = False):
     cap=cv2.VideoCapture(path)
-    #ret,im=cap.read()
+    ret,im=cap.read()
 
     img_name=0
     flag =0

@@ -27,7 +27,7 @@ You can download all checkpoints from this [Drive](https://drive.google.com/driv
 Soccer-Players-Detection-and-Tracking
 ├── checkpoints_runs
 │   ├── player_det_resnet18_student.path
-│   ├── player_det_resnet18_student.path
+│   ├── player_det_resnet50_teacher.path
 ├── scripts
 ```
 <hr>

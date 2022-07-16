@@ -58,7 +58,7 @@ cd scripts/detection
 python eval_video.py --invideo <video_name.mp4> --birdeye --classify --backbone resnet18 --checkpoint ../../checkpoints_runs/player_det_resnet50_teacher.pth
 
 ```
-
+output video will be in 'birdEye.mp4' if '--birdeye' and in 'frontEye.mp4' by default. Also, you can specify the output name using '--birdout' and '--frontout'.
 **Player tracking**
 
 The code for tracking is based on the [Extending IOU Based Multi-Object Tracking by Visual Information]
@@ -70,6 +70,7 @@ cd scripts/tracking
 python main_tracking --visualize --input_path <your_video.mp4>
 ```
 
+output video will be 'result/output_tracking/out.mp4' or you can specify your own out path using '--output_path'.
 **Single player tracking**
 
 * you can test your own video using the command below or using our videos above.

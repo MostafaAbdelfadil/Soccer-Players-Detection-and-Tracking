@@ -68,10 +68,10 @@ The code for tracking is based on the [Extending IOU Based Multi-Object Tracking
 
 ```
 cd scripts/tracking
-python main_tracking.py --visualize --input_path <your_video.mp4>
+python main_tracking.py --visualize --input_path <your_video.mp4> --output_path <destination_folder>
 ```
 
-output video will be 'result/output_tracking/out.mp4' or you can specify your own out path using '--output_path'.
+output video will be 'result/output_tracking/out.mp4' by default or you can specify your own out folder path using '--output_path' by providing the folder without the file name.
 **Single player tracking**
 
 * you can test your own video using the command below or using our videos above.

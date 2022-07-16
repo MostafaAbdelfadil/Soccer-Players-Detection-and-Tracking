@@ -14,6 +14,7 @@ Torchvision >= 0.1.0
 OpenCV >= 4.0.0
 Pillow >= 7.1.0
 scipy >= 1.7.0
+motmetrics
 ``` 
 <hr>
 

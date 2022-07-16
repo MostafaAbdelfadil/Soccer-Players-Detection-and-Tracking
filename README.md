@@ -78,7 +78,7 @@ output video will be 'result/output_tracking/out.mp4' by default or you can spec
 
 ```
 cd scripts/single_tracking
-python single_track.py INPUT_VIDEO_PATH [-p PLAYER_NAME]
+python single_track.py INPUT_VIDEO_PATH OUTPUT_VIDEO_PATH [-p PLAYER_NAME]
 ```
 Provide it with the input video path, the output video path and optionally the player’s name.
 

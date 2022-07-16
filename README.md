@@ -28,12 +28,26 @@ Soccer-Players-Detection-and-Tracking
 
 ## Testing 
 
-**Download data**
+**Download video**
+You can download invideo.mp4 from this [Drive](https://drive.google.com/file/d/1-cxoZq6cBC6irxhHCqEZIGzXqrjSz-jr/view?usp=sharing)
+You can download invideo.mp4 from this [Drive](https://drive.google.com/file/d/1YRaa89wkuPItIhEvSVgLi15FOmiAIlXv/view?usp=sharing)
+
+```
+Soccer-Players-Detection-and-Tracking
+├── checkpoints_runs
+├── scripts
+│   ├──detection
+│   │  ├──data
+│   │  │  ├── invideo.mp4
+│   │  │  ├── euro.mp4 
+```
+<hr>
 
 **Player detection**
 
 
-The script eval_video.py enables to get the detection result of the model, to do so put your test video in scripts/detection/data/<your_video.mp4>, '--birdeye' to get the birdeye view, '--classify' to apply classification. Images will be saved in the folder 'script/detection/results/out'.
+The script eval_video.py enables to get the detection result of the model, to do so put your test video in scripts/detection/data/<your_video.mp4>, '--birdeye' to get the birdeye view, '--classify' to apply classification. out video will be saved in the folder 'script/detection/results/out'.
+'--classify' is valid only on our video from stitching 'invideo.mp4'
 ```
 cd scripts/detection
 python eval_video.py --birdeye --classify --backbone resnet18 --checkpoint ../../checkpoints_runs/player_det_resnet50_teacher.pth

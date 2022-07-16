@@ -1,6 +1,10 @@
 # Soccer-Players-Detection-and-Tracking
 the purpose of this application is to apply deep learning model pretrained on soccer players to detect only field soccer players and track them during the game.
 
+
+![ezgif com-gif-maker](https://drive.google.com/file/d/1YRaa89wkuPItIhEvSVgLi15FOmiAIlXv/view?usp=sharing)
+
+
 ## Prerequisites
 ```
 PyTorch >= 1

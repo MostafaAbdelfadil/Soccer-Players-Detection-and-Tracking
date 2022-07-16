@@ -75,9 +75,10 @@ if __name__ == '__main__':
 
     #videocapture
     cap = cv2.VideoCapture(data_path + args.invideo)
-
+    ret, frame = cap.read()
     fourcc = cv2.VideoWriter_fourcc(*'MPEG')
-    cap_front = cv2.VideoWriter(out_path + args.frontout, fourcc, args.fps, (4184,630))
+    #cap_front = cv2.VideoWriter(out_path + args.frontout, fourcc, args.fps, (4184,630))
+    cap_front = cv2.VideoWriter(out_path + args.frontout, fourcc, args.fps, (frame.shape[1], frame.shape[0]))
 
     if args.birdeye:
         op = PerspectiveTransformation()

@@ -127,7 +127,7 @@ def track( model_detection, visual_feat_model, layer,
     acc = mm.MOTAccumulator(auto_id=True)
     path=input_path
     cap=cv2.cv2.VideoCapture(path)
-    #ret,imm=cap.read()
+    ret,imm=cap.read()
 
     N_IOU = 0
     N_feat = 0

@@ -11,7 +11,7 @@ from poolers import MultiScaleRoIAlign
 #from torchvision.models.utils import load_state_dict_from_url
 from torch.hub import load_state_dict_from_url
 from generalized_rcnn import GeneralizedRCNN
-from rpn import AnchorGenerator, RPNHead, RegionProposalNetwork
+from rpn1 import AnchorGenerator, RPNHead, RegionProposalNetwork
 from roi_head import RoIHeads
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from backbone_utils import resnet_fpn_backbone, detnet_fpn_backbone

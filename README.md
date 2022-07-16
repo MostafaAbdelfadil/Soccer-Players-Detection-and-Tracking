@@ -56,20 +56,12 @@ python eval_video.py --birdeye --classify --backbone resnet18 --checkpoint ../..
 
 **Player tracking**
 
-The code for tracking is based on the [LightTrack](https://github.com/Guanghan/lighttrack) code. 
+The code for tracking is based on the [Extending IOU Based Multi-Object Tracking by Visual Information]
 
-* First clone the [LightTrack](https://github.com/Guanghan/lighttrack) repository in 'script/other_utils' 
-* Change the visualizer code of the LightTrack code with the visualizer folder given in 'my_utils' : 
-
-```
-cd script
-cp -r my_utils/visualizer other_utils/lighttrack/
-```
-
-* Realize tracking on the dataset of your choice. Only the ISSIA evaluation dataset contains tracking ground-truth information. 
-Use the argument --use_GT_position is order to realize tracking on ground-truth player position data. Without this flag, the code will use the detection model decribed above.
+* you can test your own video using the command below or using our videos above.
 
 ```
-python main_tracking --data_name issia --visualize --write_video --output_path ../../results
+cd scripts/tracking
+python main_tracking --visualize --input_path <your_video.mp4>
 ```
 
